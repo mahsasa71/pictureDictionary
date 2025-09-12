@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dictionary</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+         <link rel="stylesheet" href="assets/css/fontello.css" />
+  </head>
+  <body>
+    <audio id="sound"></audio>
+    <div class="container">
+      <div class="card">
+        <div class="search-box">
+          <input
+            id="inp-word"
+            class="search-input"
+            type="text"
+            placeholder="Type a word…"
+            autocomplete="off"
+          />
+          <button id="search-btn" class="btn">Search</button>
+          <div id="autocomplete-list" class="autocomplete" hidden></div>
+        </div>
+        <div class="tip-text small muted">
+          Tip: Press Enter to search
+        </div>
+      </div>
+      <div id="result" class="card result">
+        <div class="muted">Start by searching a word.</div>
+      </div>
+      <div class="card history">
+        <div class="history-header">
+          <h3>Search History</h3>
+          <div class="history-actions">
+            <button id="clear-history" class="icon-btn" title="Clear history">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </div>
+        <ul id="history-list" class="history-list"></ul>
+        <div id="history-empty" class="muted small">No searches yet.</div>
+      </div>
+    </div>
+
+        <div class="mahsa">
+          <div class="circle">
+            <img src="https://avatars.githubusercontent.com/u/139154451?v=4" alt="" />
+          </div>
+          <a href="https://github.com/mahsasa71"
+            ><i class="icon-github-circled"></i
+          ></a>
+          <a href="https://www.instagram.com/mahsacodes?igsh=b3o4NXE4d25tYmli"
+            ><i class="icon-instagram"></i
+          ></a>
+          <a
+            href="https://www.linkedin.com/in/mahsa-sahraei?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app"
+            ><i class="icon-linkedin"></i
+          ></a>
+          <a href="mailto:sahraee.mse@gmail.com"><i class="icon-mail"></i></a>
+        </div>
+
+    <script>
+      const $ = (sel, root = document) => root.querySelector(sel);
+      const resultEl = $("#result");
+      const inputEl = $("#inp-word");
+      const btnEl = $("#search-btn");
+      const soundEl = $("#sound");
+      const acList = $("#autocomplete-list");
+      const historyList = $("#history-list");
+      const historyEmpty = $("#history-empty");
+      const clearHistoryBtn = $("#clear-history");
+
+      const DICT_URL = "https://api.dictionaryapi.dev/api/v2/entries/en/";
+      const DATAMUSE_BASE = "https://api.datamuse.com/words?";
+      const PIXABAY_KEY = "52095346-c16a4cd01c194d3951debc787";
+      const PIXABAY_URL = "https://pixabay.com/api/";
+
+      const debounce = (fn, ms = 300) => {
+        let t;
+        return (...args) => {
+          clearTimeout(t);
+          t = setTimeout(() => fn(...args), ms);
+        };
+      };
+
+      function getHistory() {
+        return JSON.parse(localStorage.getItem("history") || "[]");
+      }
+      function setHistory(arr) {
+        localStorage.setItem("history", JSON.stringify(arr));
+        renderHistory();
+      }
+      function pushHistory(word) {
+        const h = getHistory().filter(
+          (w) => w.toLowerCase() !== word.toLowerCase()
+        );
+        h.unshift(word);
+        if (h.length > 12) h.pop();
+        setHistory(h);
+      }
+      function clearHistory() {
+        setHistory([]);
+      }
+      function renderHistory() {
+        const h = getHistory();
+        historyList.innerHTML = "";
+        historyEmpty.style.display = h.length ? "none" : "block";
+        h.forEach((w) => {
+          const li = document.createElement("li");
+          li.className = "history-item";
+          li.textContent = w;
+          li.onclick = () => {
+            inputEl.value = w;
+            search(w);
+          };
+          historyList.appendChild(li);
+        });
+      }
+
+      const showAutocomplete = (items) => {
+        acList.innerHTML = "";
+        if (!items.length) {
+          acList.hidden = true;
+          return;
+        }
+        items.slice(0, 8).forEach(({ word }) => {
+          const div = document.createElement("div");
+          div.className = "autocomplete-item";
+          div.textContent = word;
+          div.onclick = () => {
+            inputEl.value = word;
+            acList.hidden = true;
+            search(word);
+          };
+          acList.appendChild(div);
+        });
+        acList.hidden = false;
+      };
+
+      const fetchAutocomplete = debounce(async (q) => {
+        if (!q) {
+          acList.hidden = true;
+          return;
+        }
+        try {
+          const res = await fetch(
+            `https://api.datamuse.com/sug?s=${encodeURIComponent(q)}`
+          );
+          const data = await res.json();
+          showAutocomplete(data);
+        } catch (e) {
+          acList.hidden = true;
+        }
+      }, 200);
+
+      inputEl.addEventListener("input", (e) =>
+        fetchAutocomplete(e.target.value.trim())
+      );
+      document.addEventListener("click", (e) => {
+        if (!acList.contains(e.target) && e.target !== inputEl)
+          acList.hidden = true;
+      });
+      btnEl.addEventListener("click", () => search(inputEl.value.trim()));
+      inputEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          search(inputEl.value.trim());
+        }
+      });
+
+      clearHistoryBtn.addEventListener("click", clearHistory);
+
+      async function fetchJson(url) {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      }
+
+      async function fetchPixabayImages(word) {
+        let box = document.getElementById("image-box");
+        if (!box) {
+          box = document.createElement("div");
+          box.id = "image-box";
+          box.className = "image-box";
+          resultEl.appendChild(box);
+        }
+        box.innerHTML = '<div class="muted small">Fetching images…</div>';
+        try {
+          const res = await fetch(
+            `${PIXABAY_URL}?key=${PIXABAY_KEY}&q=${encodeURIComponent(
+              word
+            )}&image_type=photo&per_page=4`
+          );
+          const data = await res.json();
+          if (data.hits && data.hits.length > 0) {
+            box.innerHTML = "";
+            data.hits.forEach((hit) => {
+              const img = document.createElement("img");
+              img.src = hit.webformatURL;
+              img.alt = word;
+              img.loading = "lazy";
+              img.style.maxWidth = "180px";
+              img.style.margin = "5px";
+              box.appendChild(img);
+            });
+          } else {
+            box.innerHTML = '<div class="muted small">No images found.</div>';
+          }
+        } catch (err) {
+          box.innerHTML = '<div class="muted small">Error loading images.</div>';
+          console.error(err);
+        }
+      }
+
+      async function loadSynonymsAntonyms(word) {
+        const synonymsDiv = document.querySelector(".synonyms");
+        const antonymsDiv = document.querySelector(".antonyms");
+
+        synonymsDiv.innerHTML = '<div class="label">Synonyms:</div>Loading…';
+        antonymsDiv.innerHTML = '<div class="label">Antonyms:</div>Loading…';
+
+        try {
+          const synRes = await fetch(
+            `https://api.datamuse.com/words?rel_syn=${encodeURIComponent(
+              word
+            )}&max=10`
+          );
+          const synData = await synRes.json();
+          const synList = synData.map((d) => d.word);
+          synonymsDiv.innerHTML = `<div class="label">Synonyms:</div>${
+            synList.length ? synList.join(", ") : "N/A"
+          }`;
+
+          const antRes = await fetch(
+            `https://api.datamuse.com/words?rel_ant=${encodeURIComponent(
+              word
+            )}&max=10`
+          );
+          const antData = await antRes.json();
+          const antList = antData.map((d) => d.word);
+          antonymsDiv.innerHTML = `<div class="label">Antonyms:</div>${
+            antList.length ? antList.join(", ") : "N/A"
+          }`;
+        } catch (err) {
+          console.error(err);
+          synonymsDiv.innerHTML = '<div class="label">Synonyms:</div>N/A';
+          antonymsDiv.innerHTML = '<div class="label">Antonyms:</div>N/A';
+        }
+      }
+
+      async function search(word) {
+        if (!word) return;
+        btnEl.disabled = true;
+        acList.hidden = true;
+        resultEl.innerHTML = '<div class="muted">Loading…</div>';
+        try {
+          const dict = await fetchJson(
+            `${DICT_URL}${encodeURIComponent(word)}`
+          );
+          const entry = Array.isArray(dict) ? dict[0] : null;
+          if (!entry) throw new Error("No entry found");
+          pushHistory(word);
+
+          const audioSrc =
+            (entry.phonetics || [])
+              .map((p) => p.audio)
+              .find((a) => a && a.startsWith("https")) || "";
+
+          resultEl.innerHTML = `
+            <div class="word-row">
+              <h2>${entry.word}</h2>
+              ${
+                audioSrc
+                  ? `<button class="icon-btn" onclick="soundEl.src='${audioSrc}'; soundEl.play();"><i class="fas fa-volume-up"></i></button>`
+                  : ""
+              }
+            </div>
+            <div class="details">
+              <p class="pill">${entry.meanings[0].partOfSpeech || ""}</p>
+              <p>${entry.phonetic || ""}</p>
+            </div>
+            <div class="meaning"><div class="label">Meaning:</div>${
+              entry.meanings[0].definitions[0].definition
+            }</div>
+            <div class="example"><div class="label">Example:</div>${
+              entry.meanings[0].definitions[0].example || "N/A"
+            }</div>
+            <div class="synonyms"><div class="label">Synonyms:</div>Loading…</div>
+            <div class="antonyms"><div class="label">Antonyms:</div>Loading…</div>
+          `;
+
+          await fetchPixabayImages(word);
+          await loadSynonymsAntonyms(word);
+        } catch (err) {
+          console.error(err);
+          resultEl.innerHTML = `<div class="muted">Could not find the word.</div>`;
+        } finally {
+          btnEl.disabled = false;
+        }
+      }
+
+      renderHistory();
+    </script>
+  </body>
+</html>
