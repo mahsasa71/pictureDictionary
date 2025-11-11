@@ -1,6 +1,6 @@
 # pictureDictionary
 <img width="1900" height="922" alt="Image" src="https://github.com/user-attachments/assets/c612a26e-ed6c-47cf-9593-cf72d9ba502c" />
-- [Demo Project](mahsasa71.github.io/pictureDictionary/)
+- [[Demo Project](mahsasa71.github.io/pictureDictionary/)]
 
 - Developed by Mahsa sahraei
 
